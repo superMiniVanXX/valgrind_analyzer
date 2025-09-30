@@ -1,0 +1,16 @@
+# Valgrind Log Analyzer Dependencies
+
+# Excel file generation
+openpyxl>=3.1.0
+
+# Data manipulation and analysis
+pandas>=2.0.0
+
+# Type checking support
+typing-extensions>=4.0.0
+
+# Development dependencies (optional)
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=23.0.0
+mypy>=1.0.0
