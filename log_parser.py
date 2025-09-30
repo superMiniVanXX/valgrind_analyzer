@@ -40,15 +40,15 @@ class LogParser:
         """Compile regex patterns for different types of memory issues."""
         patterns = {
             IssueType.DEFINITELY_LOST: re.compile(
-                r'==\d+==\s+(\d+)\s+bytes?\s+in\s+(\d+)\s+blocks?\s+are\s+definitely\s+lost\s+in\s+loss\s+record\s+(.+)',
+                r'==\d+==\s+([\d,]+)(?:\s+\([^)]+\))?\s+bytes?\s+in\s+([\d,]+)\s+blocks?\s+are\s+definitel?y\s+lost\s+in\s+loss\s+record\s+(.+)',
                 re.IGNORECASE
             ),
             IssueType.POSSIBLY_LOST: re.compile(
-                r'==\d+==\s+(\d+)\s+bytes?\s+in\s+(\d+)\s+blocks?\s+are\s+possibly\s+lost\s+in\s+loss\s+record\s+(.+)',
+                r'==\d+==\s+([\d,]+)(?:\s+\([^)]+\))?\s+bytes?\s+in\s+([\d,]+)\s+blocks?\s+are\s+possibl?y\s+lost\s+in\s+loss\s+record\s+(.+)',
                 re.IGNORECASE
             ),
             IssueType.STILL_REACHABLE: re.compile(
-                r'==\d+==\s+(\d+)\s+bytes?\s+in\s+(\d+)\s+blocks?\s+are\s+still\s+reachable\s+in\s+loss\s+record\s+(.+)',
+                r'==\d+==\s+([\d,]+)(?:\s+\([^)]+\))?\s+bytes?\s+in\s+([\d,]+)\s+blocks?\s+are\s+still\s+reachabl?e\s+in\s+loss\s+record\s+(.+)',
                 re.IGNORECASE
             ),
             IssueType.INVALID_READ: re.compile(
@@ -205,8 +205,9 @@ class LogParser:
                     return (issue_type, int(match.group(1)), 1, "N/A")
                 else:
                     # For memory leaks, extract bytes, blocks, and loss record
-                    bytes_count = int(match.group(1))
-                    blocks_count = int(match.group(2))
+                    # Remove commas from numbers before converting to int
+                    bytes_count = int(match.group(1).replace(',', ''))
+                    blocks_count = int(match.group(2).replace(',', ''))
                     loss_record = match.group(3).strip()
                     return (issue_type, bytes_count, blocks_count, loss_record)
         

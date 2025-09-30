@@ -20,6 +20,57 @@ from issue_classifier import IssueClassifier
 from excel_reporter import ExcelReporter, ExcelReportError
 
 
+def filter_issues_by_module(issues: List[MemoryIssue], module_filter: str) -> List[MemoryIssue]:
+    """
+    Filter memory issues to only include those related to a specific module.
+    
+    Args:
+        issues: List of all memory issues
+        module_filter: Module name to filter by (case-insensitive)
+        
+    Returns:
+        Filtered list of memory issues
+    """
+    if not module_filter:
+        return issues
+    
+    filtered_issues = []
+    module_filter_lower = module_filter.lower()
+    
+    for issue in issues:
+        # Check if any stack frame contains the module name
+        module_found = False
+        
+        # Check in function names
+        for frame in issue.stack_trace:
+            if (frame.function_name and 
+                module_filter_lower in frame.function_name.lower()):
+                module_found = True
+                break
+            
+            # Check in library names
+            if (frame.library and 
+                module_filter_lower in frame.library.lower()):
+                module_found = True
+                break
+            
+            # Check in source file names
+            if (frame.source_file and 
+                module_filter_lower in frame.source_file.lower()):
+                module_found = True
+                break
+        
+        # Also check the main source location
+        if (not module_found and issue.source_location and 
+            module_filter_lower in issue.source_location.lower()):
+            module_found = True
+        
+        if module_found:
+            filtered_issues.append(issue)
+    
+    return filtered_issues
+
+
 def export_to_csv(classified_issues: ClassifiedIssues, output_path: str) -> None:
     """
     Export classified issues to CSV format as fallback.
@@ -109,6 +160,10 @@ def main() -> None:
         action="store_true",
         help="Enable verbose logging"
     )
+    parser.add_argument(
+        "-m", "--module",
+        help="Filter issues by module/component name (e.g., 'dcc', 'DConfigWatcher'). Only shows issues with stack traces containing this module."
+    )
     
     args = parser.parse_args()
     
@@ -139,6 +194,18 @@ def main() -> None:
         
         print(f"Found {len(issues)} memory issues")
         
+        # Apply module filter if specified
+        if args.module:
+            logging.info(f"Filtering issues by module: {args.module}")
+            original_count = len(issues)
+            issues = filter_issues_by_module(issues, args.module)
+            filtered_count = len(issues)
+            print(f"After filtering by module '{args.module}': {filtered_count} issues ({original_count - filtered_count} filtered out)")
+            
+            if not issues:
+                print(f"No memory issues found related to module '{args.module}'.")
+                return
+        
         # Classify and analyze issues
         logging.info("Classifying and analyzing issues...")
         classified_issues = classifier.classify_issues(issues)
@@ -146,14 +213,22 @@ def main() -> None:
         # Generate Excel report
         logging.info("Generating Excel report...")
         try:
-            reporter.generate_report(classified_issues, args.output)
-            print(f"Excel report generated successfully: {args.output}")
+            # Adjust output filename if module filter is applied
+            output_path = args.output
+            if args.module:
+                output_path = args.output.replace('.xlsx', f'_{args.module}.xlsx')
+            
+            reporter.generate_report(classified_issues, output_path)
+            print(f"Excel report generated successfully: {output_path}")
             
         except ExcelReportError as e:
             if args.csv_fallback:
                 print(f"Excel generation failed: {e}")
                 print("Attempting CSV fallback...")
                 csv_output = args.output.replace('.xlsx', '.csv')
+                if args.module:
+                    # Add module name to CSV filename
+                    csv_output = csv_output.replace('.csv', f'_{args.module}.csv')
                 export_to_csv(classified_issues, csv_output)
                 print(f"CSV report generated: {csv_output}")
             else:
